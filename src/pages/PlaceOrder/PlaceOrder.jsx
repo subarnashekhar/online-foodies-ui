@@ -4,14 +4,25 @@ import { assets } from "../../assets/assets";
 import { StoreContext } from "../../context/StoreContext";
 import { calculateCartTotals } from "../../util/cartUtils";
 import { toast } from "react-toastify";
-import { RAZORPAY_KEY } from "../../util/contants";
+import { RAZORPAY_KEY, STRIPE_KEY } from "../../util/constants";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
 import { useNavigate } from "react-router-dom";
+import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import {
   createOrder,
   deleteOrder,
   verifyPayment,
 } from "../../service/orderService";
 import { clearCartItems } from "../../service/cartService";
+
+const stripePromise = loadStripe(STRIPE_KEY);
+
+const [amountInput, setAmountInput] = useState(""); // user typed amount in USD
+const [clientSecret, setClientSecret] = useState("");
+const [amount, setAmount] = useState(null);
+const [loading, setLoading] = useState(false);
+
 
 const PlaceOrder = () => {
   const { foodList, quantities, setQuantities, token } =
@@ -56,9 +67,10 @@ const PlaceOrder = () => {
 
     try {
       const response = await createOrder(orderData, token);
-      if (response.razorpayOrderId) {
+
+      if (response.stripeOrderId) {
         // initiate the payment
-        initiateRazorpayPayment(response);
+        initiateStripePayment(response);
       } else {
         toast.error("Unable to place order. Please try again.");
       }
@@ -67,11 +79,11 @@ const PlaceOrder = () => {
     }
   };
 
-  const initiateRazorpayPayment = (order) => {
+  const initiateStripePayment = (order) => {
     const options = {
       key: RAZORPAY_KEY,
       amount: order.amount, //Convert to paise
-      currency: "INR",
+      currency: "USD",
       name: "Food Land",
       description: "Food order payment",
       order_id: order.razorpayOrderId,
@@ -135,6 +147,7 @@ const PlaceOrder = () => {
     cartItems,
     quantities
   );
+
   return (
     <div className="container mt-4">
       <main>
@@ -168,7 +181,7 @@ const PlaceOrder = () => {
                     </small>
                   </div>
                   <span className="text-body-secondary">
-                    &#8377;{item.price * quantities[item.id]}
+                    &#x24;{item.price * quantities[item.id]}
                   </span>
                 </li>
               ))}
@@ -177,7 +190,7 @@ const PlaceOrder = () => {
                   <span>Shipping</span>
                 </div>
                 <span className="text-body-secondary">
-                  &#8377;{subtotal === 0 ? 0.0 : shipping.toFixed(2)}
+                  &#x24;{subtotal === 0 ? 0.0 : shipping.toFixed(2)}
                 </span>
               </li>
               <li className="list-group-item d-flex justify-content-between">
@@ -185,162 +198,171 @@ const PlaceOrder = () => {
                   <span>Tax (10%)</span>
                 </div>
                 <span className="text-body-secondary">
-                  &#8377;{tax.toFixed(2)}
+                  &#x24;{tax.toFixed(2)}
                 </span>
               </li>
 
               <li className="list-group-item d-flex justify-content-between">
-                <span>Total (INR)</span>
-                <strong>&#8377;{total.toFixed(2)}</strong>
+                <span>Total (USD)</span>
+                <strong>&#x24;{total.toFixed(2)}</strong>
               </li>
             </ul>
-          </div>
-          <div className="col-md-7 col-lg-8">
-            <h4 className="mb-3">Billing address</h4>
-            <form className="needs-validation" onSubmit={onSubmitHandler}>
-              <div className="row g-3">
-                <div className="col-sm-6">
-                  <label htmlFor="firstName" className="form-label">
-                    First name
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="firstName"
-                    placeholder="Jhon"
-                    required
-                    name="firstName"
-                    onChange={onChangeHandler}
-                    value={data.firstName}
-                  />
-                </div>
+            {!clientSecret && (
+              <div className="col-md-7 col-lg-8">
+                <h4 className="mb-3">Billing address</h4>
+                <form className="needs-validation" onSubmit={onSubmitHandler}>
+                  <div className="row g-3">
+                    <div className="col-sm-6">
+                      <label htmlFor="firstName" className="form-label">
+                        First name
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="firstName"
+                        placeholder="Jhon"
+                        required
+                        name="firstName"
+                        onChange={onChangeHandler}
+                        value={data.firstName}
+                      />
+                    </div>
 
-                <div className="col-sm-6">
-                  <label htmlFor="lastName" className="form-label">
-                    Last name
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="lastName"
-                    placeholder="Doe"
-                    value={data.lastName}
-                    onChange={onChangeHandler}
-                    name="lastName"
-                    required
-                  />
-                </div>
+                    <div className="col-sm-6">
+                      <label htmlFor="lastName" className="form-label">
+                        Last name
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="lastName"
+                        placeholder="Doe"
+                        value={data.lastName}
+                        onChange={onChangeHandler}
+                        name="lastName"
+                        required
+                      />
+                    </div>
 
-                <div className="col-12">
-                  <label htmlFor="email" className="form-label">
-                    Email
-                  </label>
-                  <div className="input-group has-validation">
-                    <span className="input-group-text">@</span>
-                    <input
-                      type="email"
-                      className="form-control"
-                      id="email"
-                      placeholder="Email"
-                      required
-                      name="email"
-                      onChange={onChangeHandler}
-                      value={data.email}
-                    />
+                    <div className="col-12">
+                      <label htmlFor="email" className="form-label">
+                        Email
+                      </label>
+                      <div className="input-group has-validation">
+                        <span className="input-group-text">@</span>
+                        <input
+                          type="email"
+                          className="form-control"
+                          id="email"
+                          placeholder="Email"
+                          required
+                          name="email"
+                          onChange={onChangeHandler}
+                          value={data.email}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label htmlFor="phone" className="form-label">
+                        Phone Number
+                      </label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        id="phone"
+                        placeholder="9876543210"
+                        required
+                        value={data.phoneNumber}
+                        name="phoneNumber"
+                        onChange={onChangeHandler}
+                      />
+                    </div>
+                    <div className="col-12">
+                      <label htmlFor="address" className="form-label">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="address"
+                        placeholder="1234 Main St"
+                        required
+                        value={data.address}
+                        name="address"
+                        onChange={onChangeHandler}
+                      />
+                    </div>
+                    <div className="col-md-5">
+                      <label htmlFor="state" className="form-label">
+                        State
+                      </label>
+                      <select
+                        className="form-select"
+                        id="state"
+                        required
+                        name="state"
+                        value={data.state}
+                        onChange={onChangeHandler}
+                      >
+                        <option value="">Choose...</option>
+                        <option>St Louis</option>
+                      </select>
+                    </div>
+
+                    <div className="col-md-4">
+                      <label htmlFor="city" className="form-label">
+                        City
+                      </label>
+                      <select
+                        className="form-select"
+                        id="city"
+                        required
+                        name="city"
+                        value={data.city}
+                        onChange={onChangeHandler}
+                      >
+                        <option value="">Choose...</option>
+                        <option>Banglore</option>
+                      </select>
+                    </div>
+
+                    <div className="col-md-3">
+                      <label htmlFor="zip" className="form-label">
+                        Zip
+                      </label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        id="zip"
+                        placeholder="98745"
+                        required
+                        name="zip"
+                        value={data.zip}
+                        onChange={onChangeHandler}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="col-12">
-                  <label htmlFor="phone" className="form-label">
-                    Phone Number
-                  </label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    id="phone"
-                    placeholder="9876543210"
-                    required
-                    value={data.phoneNumber}
-                    name="phoneNumber"
-                    onChange={onChangeHandler}
-                  />
-                </div>
-                <div className="col-12">
-                  <label htmlFor="address" className="form-label">
-                    Address
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="address"
-                    placeholder="1234 Main St"
-                    required
-                    value={data.address}
-                    name="address"
-                    onChange={onChangeHandler}
-                  />
-                </div>
-                <div className="col-md-5">
-                  <label htmlFor="state" className="form-label">
-                    State
-                  </label>
-                  <select
-                    className="form-select"
-                    id="state"
-                    required
-                    name="state"
-                    value={data.state}
-                    onChange={onChangeHandler}
-                  >
-                    <option value="">Choose...</option>
-                    <option>Karnataka</option>
-                  </select>
-                </div>
 
-                <div className="col-md-4">
-                  <label htmlFor="city" className="form-label">
-                    City
-                  </label>
-                  <select
-                    className="form-select"
-                    id="city"
-                    required
-                    name="city"
-                    value={data.city}
-                    onChange={onChangeHandler}
-                  >
-                    <option value="">Choose...</option>
-                    <option>Banglore</option>
-                  </select>
-                </div>
+                  <hr className="my-4" />
 
-                <div className="col-md-3">
-                  <label htmlFor="zip" className="form-label">
-                    Zip
-                  </label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    id="zip"
-                    placeholder="98745"
-                    required
-                    name="zip"
-                    value={data.zip}
-                    onChange={onChangeHandler}
-                  />
-                </div>
+                  <button
+                    className="w-100 btn btn-primary btn-lg"
+                    type="submit"
+                    disabled={cartItems.length === 0}
+                  >
+                    Continue to checkout
+                  </button>
+                </form>
               </div>
+            )}
 
-              <hr className="my-4" />
-
-              <button
-                className="w-100 btn btn-primary btn-lg"
-                type="submit"
-                disabled={cartItems.length === 0}
-              >
-                Continue to checkout
-              </button>
-            </form>
+      {clientSecret && (
+        <Elements stripe={stripePromise} options={{ clientSecret }}>
+          <CheckoutForm clientSecret={clientSecret} amount={amount} />
+        </Elements>
+      )}
           </div>
+
         </div>
       </main>
     </div>

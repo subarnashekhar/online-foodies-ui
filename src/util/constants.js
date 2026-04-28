@@ -1,0 +1,2 @@
+export const RAZORPAY_KEY = "razor_pay_key";
+export const STRIPE_KEY = "pk_test_51TQsNBAMaEUYoNhxKE827tjQ1yLcmH6GjtnBlfZfxZxTlfunEGtWucdDpeVhXkhp5BpKWcLeU0INVfPow8DbWu6i00KfqAORZt";
