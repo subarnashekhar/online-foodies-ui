@@ -1,6 +1,7 @@
 import axios from "axios";
+import { SERVER_BASE_URL } from "./axiosConfig";
 
-const API_URL = "http://localhost:8080/api/orders";
+const API_URL = `${SERVER_BASE_URL}/api/orders`;
 
 export const fetchUserOrders = async (token) => {
     try {

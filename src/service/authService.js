@@ -1,6 +1,7 @@
 import axios from "axios";
+import { SERVER_BASE_URL } from "./axiosConfig";
 
-const API_URL = "http://localhost:8080/api";
+const API_URL = `${SERVER_BASE_URL}/api`;
 
 export const registerUser = async (data) => {
     try {
