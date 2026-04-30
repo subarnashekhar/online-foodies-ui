@@ -47,7 +47,7 @@ const MyOrders = () => {
                         }
                       })}
                     </td>
-                    <td>&#x20B9;{order.amount.toFixed(2)}</td>
+                    <td>${order.amount.toFixed(2)}</td>
                     <td>Items: {order.orderedItems.length}</td>
                     <td className="fw-bold text-capitalize">
                       &#x25cf;{order.orderStatus}
